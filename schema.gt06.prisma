@@ -1,0 +1,21 @@
+// Agregar este modelo a tu schema.prisma existente y correr:
+//   npx prisma migrate dev --name add_position_history
+//
+// Ajustá los campos companyId/unitId a como estén modeladas las
+// unidades/empresas en tu esquema real — quedó con `imei` como
+// referencia mínima para no bloquear la integración.
+
+model PositionHistory {
+  id            String   @id @default(cuid())
+  imei          String
+  latitude      Float
+  longitude     Float
+  speedKmh      Int
+  course        Int
+  satellites    Int
+  gpsPositioned Boolean
+  recordedAt    DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([imei, recordedAt])
+}
