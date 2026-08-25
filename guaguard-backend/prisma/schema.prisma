@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NOTA: Company y Unit son un placeholder mínimo. Cuando definas con
+// Michael cómo se modelan de verdad empresas/unidades, ajustá estos
+// dos modelos (o los que agregues) y las relaciones de abajo.
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  units     Unit[]
+  createdAt DateTime @default(now())
+}
+
+model Unit {
+  id        String             @id @default(cuid())
+  imei      String             @unique
+  companyId String
+  company   Company            @relation(fields: [companyId], references: [id])
+  positions PositionHistory[]
+  createdAt DateTime           @default(now())
+}
+
+model PositionHistory {
+  id            String   @id @default(cuid())
+  imei          String
+  unitId        String?
+  unit          Unit?    @relation(fields: [unitId], references: [id])
+  companyId     String?
+  latitude      Float
+  longitude     Float
+  speedKmh      Int
+  course        Int
+  satellites    Int
+  gpsPositioned Boolean
+  recordedAt    DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([imei, recordedAt])
+  @@index([unitId, recordedAt])
+}
