@@ -15,6 +15,7 @@ model Company {
   id        String   @id @default(cuid())
   name      String
   units     Unit[]
+  routes    Route[]
   createdAt DateTime @default(now())
 }
 
@@ -23,6 +24,8 @@ model Unit {
   imei      String             @unique
   companyId String
   company   Company            @relation(fields: [companyId], references: [id])
+  routeId   String?
+  route     Route?             @relation(fields: [routeId], references: [id])
   positions PositionHistory[]
   createdAt DateTime           @default(now())
 }
@@ -44,4 +47,28 @@ model PositionHistory {
 
   @@index([imei, recordedAt])
   @@index([unitId, recordedAt])
+}
+
+model Route {
+  id        String   @id @default(cuid())
+  name      String
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  stops     Stop[]
+  units     Unit[]
+  routes    Route[]
+  createdAt DateTime @default(now())
+}
+
+model Stop {
+  id        String   @id @default(cuid())
+  routeId   String
+  route     Route    @relation(fields: [routeId], references: [id])
+  name      String
+  latitude  Float
+  longitude Float
+  order     Int
+  createdAt DateTime @default(now())
+
+  @@index([routeId, order])
 }
