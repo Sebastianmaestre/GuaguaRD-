@@ -1,38 +1,35 @@
-/**
- * Simulador mínimo de un dispositivo GT06.
- * Se conecta al servidor TCP (GT06_PORT), manda un LOGIN y después
- * posiciones falsas cada 5s, moviéndose de a poquito. Sirve para
- * probar todo el flujo (Redis, Postgres, WebSocket) sin el hardware.
- *
- * Uso:
- *   node simulator.js
- *   node simulator.js 868765432109123   (IMEI custom)
- */
 const net = require('net');
 
 const PORT = Number(process.env.GT06_PORT) || 5023;
 const HOST = process.env.GT06_HOST || 'localhost';
 const IMEI = process.argv[2] || '868765432109123';
 
-function crc16(buf) {
+function crc16(buffer) {
   let crc = 0xffff;
-  for (const b of buf) {
-    crc ^= b;
-    for (let i = 0; i < 8; i++) {
-      crc = crc & 1 ? (crc >> 1) ^ 0xa001 : crc >> 1;
+  for (let i = 0; i < buffer.length; i++) {
+    crc ^= buffer[i];
+    for (let j = 0; j < 8; j++) {
+      if (crc & 0x0001) {
+        crc = (crc >>> 1) ^ 0x8408;
+      } else {
+        crc = crc >>> 1;
+      }
     }
   }
-  return crc & 0xffff;
+  return (~crc) & 0xffff;
 }
 
 function buildPacket(protocolNo, content) {
   const serial = Buffer.from([0x00, 0x01]);
   const body = Buffer.concat([Buffer.from([protocolNo]), content, serial]);
+  const lengthByte = Buffer.from([body.length + 2]);
+  const crcInput = Buffer.concat([lengthByte, body]);
+  const crcVal = crc16(crcInput);
   const crcBuf = Buffer.alloc(2);
-  crcBuf.writeUInt16BE(crc16(Buffer.concat([Buffer.from([body.length + 2]), body])), 0);
+  crcBuf.writeUInt16BE(crcVal, 0);
   return Buffer.concat([
     Buffer.from([0x78, 0x78]),
-    Buffer.from([body.length + 2]),
+    lengthByte,
     body,
     crcBuf,
     Buffer.from([0x0d, 0x0a]),
@@ -40,7 +37,6 @@ function buildPacket(protocolNo, content) {
 }
 
 function loginPacket(imei) {
-  // Simplificado: 8 bytes BCD del IMEI + tipo de dispositivo
   const imeiBuf = Buffer.from(imei.padStart(16, '0'), 'hex');
   const typeBuf = Buffer.from([0x00, 0x01]);
   return buildPacket(0x01, Buffer.concat([imeiBuf, typeBuf]));
@@ -56,13 +52,13 @@ function locationPacket(lat, lng, speed) {
     now.getUTCMinutes(),
     now.getUTCSeconds(),
   ]);
-  const satellitesBuf = Buffer.from([0x0c]); // 12 satélites
+  const satellitesBuf = Buffer.from([0x0c]);
   const latBuf = Buffer.alloc(4);
   latBuf.writeUInt32BE(Math.round(Math.abs(lat) * 30000 * 60), 0);
   const lngBuf = Buffer.alloc(4);
   lngBuf.writeUInt32BE(Math.round(Math.abs(lng) * 30000 * 60), 0);
   const speedBuf = Buffer.from([speed & 0xff]);
-  const courseStatusBuf = Buffer.from([0x00, 0x00]); // course + flags (gps positioned bit, etc.)
+  const courseStatusBuf = Buffer.from([0x00, 0x00]);
 
   return buildPacket(
     0x22,
